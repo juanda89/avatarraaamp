@@ -58,6 +58,12 @@ export async function POST(req: Request) {
       voice_id: process.env.LIVEAVATAR_VOICE_ID,
       context_id: process.env.LIVEAVATAR_CONTEXT_ID,
       language: process.env.LIVEAVATAR_LANGUAGE ?? "es",
+      // el STT por defecto transcribe el español como inglés; gladia
+      // (whisper) detecta el idioma solo. Opciones: deepgram,
+      // assembly_ai, gladia, elevenlabs
+      stt_config: {
+        provider: process.env.LIVEAVATAR_STT_PROVIDER ?? "gladia",
+      },
     },
   };
 
