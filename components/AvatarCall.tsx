@@ -79,13 +79,36 @@ export default function AvatarCall() {
   }, [cleanup]);
 
   // ?autostart=1 lanza la llamada al cargar (pruebas / modo kiosco)
+  // ?fakemic=1 (solo con debug) reemplaza el micrófono por /voz_test.wav
   const autoStartedRef = useRef(false);
   useEffect(() => {
     if (autoStartedRef.current) return;
-    if (new URLSearchParams(window.location.search).get("autostart") === "1") {
-      autoStartedRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("autostart") !== "1") return;
+    autoStartedRef.current = true;
+    (async () => {
+      if (params.get("fakemic") === "1" && params.get("debug") === "1") {
+        try {
+          const buf = await fetch("/voz_test.wav").then((r) =>
+            r.arrayBuffer(),
+          );
+          const ctx = new AudioContext({ sampleRate: 48000 });
+          await ctx.resume();
+          const audio = await ctx.decodeAudioData(buf);
+          const dest = ctx.createMediaStreamDestination();
+          const src = ctx.createBufferSource();
+          src.buffer = audio;
+          src.loop = true;
+          src.connect(dest);
+          src.start();
+          navigator.mediaDevices.getUserMedia = async () => dest.stream;
+          debugLog("fakemic.ready", { dur: audio.duration });
+        } catch (e) {
+          debugLog("fakemic.error", String(e));
+        }
+      }
       startCall();
-    }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -237,6 +260,30 @@ export default function AvatarCall() {
         await session.voiceChat.start();
         setMicBlocked(false);
         debugLog("voicechat.started", { muted: session.voiceChat.isMuted });
+        // en debug, medir el nivel real del micrófono unos segundos
+        if (
+          new URLSearchParams(window.location.search).get("debug") === "1"
+        ) {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+          });
+          const ctx = new AudioContext();
+          const analyser = ctx.createAnalyser();
+          ctx.createMediaStreamSource(stream).connect(analyser);
+          const buf = new Float32Array(analyser.fftSize);
+          let ticks = 0;
+          const iv = setInterval(() => {
+            analyser.getFloatTimeDomainData(buf);
+            let acc = 0;
+            for (const v of buf) acc += v * v;
+            debugLog("mic.rms", Math.round(Math.sqrt(acc / buf.length) * 1e4));
+            if (++ticks >= 12) {
+              clearInterval(iv);
+              ctx.close();
+              stream.getTracks().forEach((t) => t.stop());
+            }
+          }, 2000);
+        }
       } catch (e) {
         // sin micrófono la llamada sigue: el avatar saluda y habla igual
         setMicBlocked(true);

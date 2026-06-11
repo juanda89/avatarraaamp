@@ -9,3 +9,4 @@ out/
 npm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
+public/voz_test.wav
