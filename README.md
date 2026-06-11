@@ -80,22 +80,23 @@ gringo. La solución es una voz de ElevenLabs:
 
 - ✅ Voz elegida y agregada a la cuenta de ElevenLabs: **"Christian - Calm Latin voice"**
   (hombre, acento de Medellín), ElevenLabs voice ID `WbPw2BEKJmkwDvOBt9Z9`.
-- ⚠️ Pendiente: ElevenLabs solo permite integraciones de terceros (como LiveAvatar) en
-  **cuentas de pago** (plan Starter, $5/mes). Con el plan activo, ejecutar:
+- ✅ Script de activación listo: con `ELEVENLABS_API_KEY` en `.env.local`, ejecutar
 
-```bash
-# 1. Registrar la key de ElevenLabs en LiveAvatar (devuelve secret_id)
-curl -X POST https://api.liveavatar.com/v1/secrets \
-  -H "X-API-KEY: $LIVEAVATAR_API_KEY" -H "Content-Type: application/json" \
-  -d '{"secret_type": "ELEVENLABS_API_KEY", "secret_value": "<ELEVENLABS_KEY>", "secret_name": "ElevenLabs JD"}'
+  ```bash
+  node scripts/activar-voz-colombiana.mjs
+  ```
 
-# 2. Importar la voz (devuelve el voice_id de LiveAvatar)
-curl -X POST https://api.liveavatar.com/v1/voices/third_party \
-  -H "X-API-KEY: $LIVEAVATAR_API_KEY" -H "Content-Type: application/json" \
-  -d '{"secret_id": "<secret_id>", "voice_id": "WbPw2BEKJmkwDvOBt9Z9"}'
+  Registra la key en LiveAvatar, importa la voz y actualiza `LIVEAVATAR_VOICE_ID`
+  en `.env.local`; al final imprime el valor para copiarlo a Vercel y redesplegar.
+- ⚠️ Único pendiente: ElevenLabs solo permite integraciones de terceros (como
+  LiveAvatar) en **cuentas de pago** (plan Starter, $5/mes). En plan gratis el script
+  lo detecta y te lo dice. Solo las voces externas tienen este requisito — el resto
+  de la app no depende de ElevenLabs.
 
-# 3. Poner el voice_id devuelto en LIVEAVATAR_VOICE_ID (.env.local y Vercel)
-```
+  Nota: el API de LiveAvatar solo importa voces de ElevenLabs (sus secretos aceptan
+  únicamente claves de OpenAI, ElevenLabs y Gemini). Voces de Fish Audio u otros
+  proveedores solo serían posibles re-arquitecturando a modo LITE (pipeline propio
+  de STT + LLM + TTS).
 
 ## Notas
 
