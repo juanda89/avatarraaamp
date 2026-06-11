@@ -1,0 +1,11 @@
+node_modules/
+.next/
+out/
+.env.local
+.env.liveavatar
+.env*.local
+.tmp/
+.DS_Store
+npm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
