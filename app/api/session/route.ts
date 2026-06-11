@@ -8,8 +8,14 @@ const SANDBOX_AVATAR_ID = "dd73ea75-1218-4ef3-92ce-606d5f7fbc0a";
 export async function POST(req: Request) {
   // pantallas en retrato (móvil) usan la variante vertical del avatar
   let portrait = false;
+  let sttOverride: string | undefined;
   try {
-    portrait = Boolean((await req.json())?.portrait);
+    const body = await req.json();
+    portrait = Boolean(body?.portrait);
+    // override del proveedor STT solo para pruebas locales
+    if (process.env.NODE_ENV !== "production") {
+      sttOverride = body?.sttProvider;
+    }
   } catch {
     // sin body → landscape
   }
@@ -62,7 +68,8 @@ export async function POST(req: Request) {
       // (whisper) detecta el idioma solo. Opciones: deepgram,
       // assembly_ai, gladia, elevenlabs
       stt_config: {
-        provider: process.env.LIVEAVATAR_STT_PROVIDER ?? "gladia",
+        provider:
+          sttOverride ?? process.env.LIVEAVATAR_STT_PROVIDER ?? "gladia",
       },
     },
   };
@@ -87,6 +94,11 @@ export async function POST(req: Request) {
   }
 
   const json = await res.json();
+  console.log(
+    `LiveAvatar session ${json.data.session_id} (stt=${
+      sttOverride ?? process.env.LIVEAVATAR_STT_PROVIDER ?? "gladia"
+    })`,
+  );
   return NextResponse.json({
     sessionToken: json.data.session_token,
     sandbox,

@@ -78,11 +78,33 @@ export default function AvatarCall() {
     };
   }, [cleanup]);
 
+  // ?autostart=1 lanza la llamada al cargar (pruebas / modo kiosco)
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (autoStartedRef.current) return;
+    if (new URLSearchParams(window.location.search).get("autostart") === "1") {
+      autoStartedRef.current = true;
+      startCall();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // autoscroll de la transcripción
   useEffect(() => {
     const el = transcriptBodyRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [transcript, caption]);
+
+  // con ?debug=1 reporta eventos al servidor (diagnóstico local)
+  const debugLog = useCallback((tag: string, data?: unknown) => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("debug") !== "1")
+      return;
+    navigator.sendBeacon(
+      "/api/debug-log",
+      JSON.stringify({ tag, data: data ?? null }),
+    );
+  }, []);
 
   // ¿el permiso del micrófono quedó bloqueado a nivel del navegador?
   // (en ese estado getUserMedia falla al instante, sin mostrar diálogo)
@@ -115,10 +137,12 @@ export default function AvatarCall() {
 
     try {
       const portrait = window.matchMedia("(orientation: portrait)").matches;
+      const sttProvider =
+        new URLSearchParams(window.location.search).get("stt") ?? undefined;
       const res = await fetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ portrait }),
+        body: JSON.stringify({ portrait, sttProvider }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -173,9 +197,10 @@ export default function AvatarCall() {
         });
       });
 
-      session.on(AgentEventsEnum.USER_SPEAK_STARTED, () =>
-        setUserSpeaking(true),
-      );
+      session.on(AgentEventsEnum.USER_SPEAK_STARTED, () => {
+        setUserSpeaking(true);
+        debugLog("user.speak_started");
+      });
       session.on(AgentEventsEnum.USER_SPEAK_ENDED, () =>
         setUserSpeaking(false),
       );
@@ -200,6 +225,7 @@ export default function AvatarCall() {
       });
       session.on(AgentEventsEnum.USER_TRANSCRIPTION, (ev) => {
         pushEntry("user", ev.text);
+        debugLog("user.transcription", ev.text);
         setCaption((c) => (c?.role === "user" ? null : c));
       });
 
@@ -210,10 +236,12 @@ export default function AvatarCall() {
       try {
         await session.voiceChat.start();
         setMicBlocked(false);
-      } catch {
+        debugLog("voicechat.started", { muted: session.voiceChat.isMuted });
+      } catch (e) {
         // sin micrófono la llamada sigue: el avatar saluda y habla igual
         setMicBlocked(true);
         checkMicPermission();
+        debugLog("voicechat.failed", String(e));
       }
     } catch (err) {
       sessionRef.current?.stop().catch(() => {});
@@ -221,7 +249,7 @@ export default function AvatarCall() {
       setErrorMsg(err instanceof Error ? err.message : String(err));
       setCallState("error");
     }
-  }, [cleanup, pushEntry]);
+  }, [cleanup, pushEntry, checkMicPermission, debugLog]);
 
   const endCall = useCallback(async () => {
     const session = sessionRef.current;
